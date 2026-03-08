@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Safe Path Ontario</title>
+<meta name="description" content="Find support for gender-based violence in Ontario. Guided, verified, confidential.">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useCallback } = React;
+window.storage = {
+  get: async function(key) { try { var v = localStorage.getItem(key); return v ? { value: v } : null; } catch(e) { return null; } },
+  set: async function(key, value) { try { localStorage.setItem(key, value); return { key: key, value: value }; } catch(e) { return null; } }
+};
+const ADMIN_PIN = "safepath2026";
+const SK = "sp-v5";
+const REGIONS = ["All Ontario","Greater Hamilton Area","Niagara Region","Halton Region","Kitchener-Waterloo"];
+const CATS = [{id:"crisis",label:"Crisis Lines"},{id:"medical",label:"Medical Care"},{id:"counselling",label:"Counselling"},{id:"legal-info",label:"Legal Info"},{id:"legal-advocate",label:"Legal Advocacy"},{id:"shelter",label:"Shelters"},{id:"indigenous",label:"Indigenous"},{id:"lgbtq",label:"2SLGBTQ+"},{id:"male",label:"Male Survivors"},{id:"financial",label:"Financial Aid"},{id:"trafficking",label:"Trafficking"},{id:"seniors",label:"Seniors"}];
+const HL = [{id:"indigenous-led",label:"Indigenous-led",c:"#4A6741"},{id:"lgbtq-affirming",label:"2SLGBTQ+ affirming",c:"#4A6741"},{id:"male-survivors",label:"For male survivors",c:"#6B6256"},{id:"francophone",label:"French",c:"#6B6256"},{id:"newcomer-friendly",label:"Newcomer-friendly",c:"#6B6256"},{id:"multilingual",label:"Multilingual",c:"#6B6256"},{id:"no-police-required",label:"No police report required",c:"#4A6741"},{id:"anonymous",label:"Anonymous",c:"#6B6256"},{id:"youth-specific",label:"Youth-specific",c:"#6B6256"},{id:"seniors",label:"For seniors",c:"#6B6256"}];
+const SITS = [{id:"sa-recent",label:"I was recently sexually assaulted",sub:"Within the last few days or weeks"},{id:"ipv-ongoing",label:"I\u2019m experiencing violence from a partner or family member",sub:"It\u2019s happening now and I need to plan next steps"},{id:"past",label:"I\u2019m processing something from the past",sub:"Months or years ago, and I\u2019m looking for support"},{id:"leaving",label:"I\u2019m thinking about leaving a situation",sub:"I want to understand my options"},{id:"someone",label:"I\u2019m supporting someone else",sub:"A friend, partner, or family member"}];
+const NEEDS_MAP = {"sa-recent":[{id:"talk",label:"I need to talk to someone",sub:"Crisis support",cats:["crisis","counselling"]},{id:"medical",label:"I need medical care",sub:"Evidence collection, STI/pregnancy",cats:["medical"],skip:true},{id:"counselling",label:"Ongoing counselling",sub:"Longer-term support",cats:["counselling"],skip:true},{id:"legal-info",label:"I want to understand my options",sub:"Connect with an advocate or learn about reporting",cats:["legal-info","legal-advocate"],skip:true},{id:"notsure",label:"Not sure yet",sub:"Show me everything",cats:["crisis","counselling","medical","legal-info","legal-advocate"]}],"ipv-ongoing":[{id:"talk",label:"I need to talk to someone",sub:"Crisis support, safety planning",cats:["crisis","counselling"]},{id:"safety",label:"I need a safe place to stay",sub:"Emergency shelter",cats:["shelter"],skip:true},{id:"legal-advocate",label:"Help navigating the legal system",sub:"Family court support workers, protection orders",cats:["legal-advocate"],skip:true},{id:"legal-info",label:"Understand my legal rights",sub:"Family law, custody, your rights as a survivor",cats:["legal-info"],skip:true},{id:"money",label:"Financial help",sub:"Emergency funds, rent support",cats:["financial"],skip:true},{id:"counselling",label:"Ongoing counselling",sub:"Longer-term support",cats:["counselling"],skip:true},{id:"notsure",label:"Not sure yet",sub:"Show me everything",cats:["crisis","counselling","shelter","legal-info","legal-advocate","financial"]}],"past":[{id:"talk",label:"I need to talk to someone",sub:"Crisis support",cats:["crisis","counselling"]},{id:"counselling",label:"Ongoing counselling or therapy",sub:"Longer-term healing",cats:["counselling"],skip:true},{id:"legal-info",label:"I want to explore my options",sub:"There is no time limit for reporting in Ontario",cats:["legal-info","legal-advocate"],skip:true},{id:"notsure",label:"Not sure yet",sub:"Show me everything",cats:["crisis","counselling","legal-info","legal-advocate"]}],"leaving":[{id:"safety",label:"I need a safe place to stay",sub:"Emergency shelter",cats:["shelter"],skip:true},{id:"talk",label:"Talk to someone about my plan",sub:"Safety planning, crisis support",cats:["crisis","counselling"]},{id:"legal-advocate",label:"Help with the legal side",sub:"Protection orders, custody, family court support worker",cats:["legal-advocate"],skip:true},{id:"money",label:"Financial help to leave",sub:"Emergency funds, rent support",cats:["financial"],skip:true},{id:"notsure",label:"Not sure yet",sub:"Show me everything",cats:["crisis","counselling","shelter","legal-advocate","financial"]}],"someone":[{id:"talk",label:"Talk to someone about how to help",sub:"Guidance on supporting someone",cats:["crisis","counselling"]},{id:"counselling",label:"Find counselling for them",sub:"Connect them with a counsellor",cats:["counselling"],skip:true},{id:"notsure",label:"Not sure what they need",sub:"Show me everything",cats:["crisis","counselling","shelter","legal-info","legal-advocate"]}]};
+const ID_NEEDS = [{id:"indigenous",label:"Indigenous-led support",sub:"Culturally grounded services",hl:["indigenous-led"]},{id:"lgbtq",label:"2SLGBTQ+ affirming services",sub:"Affirming, knowledgeable staff",hl:["lgbtq-affirming"]},{id:"male-survivor",label:"Support for male survivors",sub:"Services for men",hl:["male-survivors"]},{id:"francophone",label:"Services en fran\u00e7ais",sub:"French-language support",hl:["francophone"]},{id:"newcomer",label:"Support for newcomers",sub:"Multilingual, immigration-aware",hl:["newcomer-friendly"]},{id:"seniors-need",label:"Support for seniors",sub:"Services for older adults",hl:["seniors"]}];
+const APPROACHES = [{id:"community",label:"Community-based support",sub:"No police or courts involved"},{id:"system",label:"May want to involve the legal system",sub:"Reporting, legal aid, court accompaniment"},{id:"both",label:"Show me all options",sub:"You decide what\u2019s right"}];
+const SEED = [
+  {id:"r1",name:"Assaulted Women\u2019s Helpline (AWHL)",categories:["crisis"],region:"All Ontario",phone:"1-866-863-0511",tty:"1-866-863-7868",text:"#SAFE (#7233)",website:"https://www.awhl.org",hours:"24/7",languages:"200+ languages",description:"Free, anonymous crisis counselling, safety planning, emotional support, information and referrals.",highlights:["multilingual","anonymous","no-police-required","newcomer-friendly"],verified:"",whatToExpect:"A trained counsellor picks up. No name needed. Share as much or as little as you want.",servicesOffered:"Crisis counselling, safety planning, referrals to shelters, legal aid, counselling.",intakeProcess:"No intake. No ID, no forms, no waitlist. Each call is anonymous.",goodToKnow:"Text #SAFE (#7233) if you can\u2019t call. Nothing reported to police without your consent."},
+  {id:"r2",name:"Fem\u2019aide",categories:["crisis"],region:"All Ontario",phone:"1-877-336-2433",tty:"1-866-860-7082",website:"https://www.femaide.ca",hours:"24/7",languages:"French",description:"French-language crisis counselling and referrals for women experiencing violence.",highlights:["francophone"],verified:""},
+  {id:"r3",name:"Talk4Healing",categories:["crisis","indigenous"],region:"All Ontario",phone:"1-855-554-4325",website:"https://www.talk4healing.com",hours:"24/7",languages:"English, Ojibway, Oji-Cree, Cree + 10 Indigenous languages",description:"Culturally safe crisis support for Indigenous women and families.",highlights:["indigenous-led","multilingual"],verified:""},
+  {id:"r5",name:"Ontario Male Survivors Crisis Line",categories:["male","crisis"],region:"All Ontario",phone:"1-866-887-0015",hours:"24/7",languages:"Multilingual",description:"Crisis and referral services for male survivors of sexual abuse.",highlights:["male-survivors","multilingual"],verified:""},
+  {id:"r6",name:"Victim Support Line",categories:["crisis","legal-info"],region:"All Ontario",phone:"1-888-579-2888",hours:"24/7",languages:"Multilingual",description:"Province-wide information and referrals for victims of crime.",verified:""},
+  {id:"r7",name:"Canadian Human Trafficking Hotline",categories:["trafficking","crisis"],region:"All Ontario",phone:"1-833-900-1010",hours:"24/7",languages:"Multilingual",description:"Connects trafficking victims with services and emergency support.",verified:""},
+  {id:"r8",name:"Seniors Safety Line",categories:["seniors","crisis"],region:"All Ontario",phone:"1-866-299-1011",hours:"24/7",languages:"Multilingual",description:"Confidential support for older adults experiencing abuse.",highlights:["seniors","multilingual"],verified:""},
+  {id:"r9",name:"Trans Lifeline",categories:["lgbtq","crisis"],region:"All Ontario",phone:"1-877-330-6366",website:"https://translifeline.org",hours:"24/7",description:"Peer support crisis hotline by and for trans people.",highlights:["lgbtq-affirming"],verified:""},
+  {id:"r10",name:"LGBT Youth Line",categories:["lgbtq","counselling"],region:"All Ontario",phone:"1-800-268-9688",text:"647-694-4275",website:"https://www.youthline.ca",hours:"Various",description:"Peer support for 2SLGBTQ+ youth via phone, text, chat.",highlights:["lgbtq-affirming","youth-specific"],verified:""},
+  {id:"r11",name:"Ontario SA/DV Treatment Centres",categories:["medical"],region:"All Ontario",phone:"1-855-628-7238",website:"https://www.sadvtreatmentcentres.ca",hours:"24/7 Navigation Line",description:"37 hospital-based centres for medical care, evidence collection, counselling.",highlights:["no-police-required"],verified:"",whatToExpect:"Go to any ER and ask for the SA/DV team. No police report needed.",intakeProcess:"Tell triage you need the sexual assault program. Private area, everything explained.",goodToKnow:"Evidence collected up to 12 days. Stored 6 months while you decide about reporting."},
+  {id:"r12",name:"Legal Aid Ontario",categories:["legal-info"],region:"All Ontario",phone:"1-800-668-8258",website:"https://www.legalaid.on.ca",hours:"Mon\u2013Fri",languages:"Multilingual",description:"Free legal help for DV survivors with family law matters.",verified:""},
+  {id:"r13",name:"Independent Legal Advice for SA Survivors",categories:["legal-info"],region:"All Ontario",website:"https://www.ontario.ca/independent-legal-advice-survivors-sexual-assault",hours:"By appointment",description:"Up to 4 hours free legal advice. No police report required.",highlights:["no-police-required"],verified:""},
+  {id:"r14",name:"ShelterSafe Ontario",categories:["shelter"],region:"All Ontario",website:"https://sheltersafe.ca/ontario/",hours:"24/7 crisis lines",description:"Find your nearest shelter and crisis line across Ontario.",verified:""},
+  {id:"r16",name:"Ontario Works Emergency Assistance",categories:["financial"],region:"All Ontario",website:"https://www.ontario.ca/page/ontario-works",hours:"Office hours",description:"Emergency financial assistance for those leaving abusive relationships.",verified:""},
+  {id:"r17",name:"Family Court Support Worker Program",categories:["legal-advocate"],region:"All Ontario",website:"https://www.ontario.ca/page/family-court-support-workers",hours:"Court hours",description:"Free support navigating family court. Every court district in Ontario.",verified:""},
+  {id:"r18",name:"Victim Crisis Assistance Ontario",categories:["crisis","legal-advocate"],region:"All Ontario",hours:"24/7",description:"On-site crisis intervention, referrals, safety planning, court accompaniment.",verified:""},
+  {id:"r55",name:"Steps to Justice",categories:["legal-info"],region:"All Ontario",website:"https://stepstojustice.ca/category/legal-topic/family-law",hours:"Online anytime",description:"Free plain-language legal information about family law.",verified:""},
+  {id:"r56",name:"Ontario Women\u2019s Justice Network",categories:["legal-info"],region:"All Ontario",website:"https://owjn.org",hours:"Online anytime",description:"Legal information for women and survivors of violence.",verified:""},
+  {id:"r57",name:"Family Law Education for Women",categories:["legal-info"],region:"All Ontario",website:"https://onefamilylaw.ca",hours:"Online anytime",languages:"14 languages",description:"Plain language legal info in 14 languages.",highlights:["multilingual","newcomer-friendly"],verified:""},
+  {id:"r58",name:"Luke\u2019s Place",categories:["legal-info","legal-advocate"],region:"All Ontario",website:"https://lukesplace.ca",hours:"Office hours",description:"Legal information, safety planning, support for women navigating family law.",verified:""},
+  {id:"h1",name:"Niagara Region Sexual Assault Centre",categories:["crisis","counselling"],region:"Niagara Region",phone:"(905) 682-4584",website:"https://www.niagarasexualassaultcentre.com/",hours:"24/7",description:"Crisis support, counselling, advocacy across Niagara.",verified:""},
+  {id:"h2",name:"SACHA (Hamilton)",categories:["crisis","counselling"],region:"Greater Hamilton Area",phone:"(905) 525-4162",website:"https://sacha.ca/",hours:"24/7",description:"Crisis support, counselling, accompaniment in Hamilton.",verified:""},
+  {id:"h3",name:"Sexual Assault Centre of Brant",categories:["crisis","counselling"],region:"Greater Hamilton Area",phone:"(519) 751-3471",website:"https://sacbrant.ca/",hours:"24/7",description:"Crisis support, counselling, advocacy in Brant County.",verified:""},
+  {id:"h4",name:"FCSW \u2014 Good Shepherd (Hamilton)",categories:["legal-advocate"],region:"Greater Hamilton Area",hours:"Office hours",description:"Family Court Support Worker at Hamilton courthouse.",verified:""},
+  {id:"h5",name:"FCSW \u2014 Haldimand & Norfolk (Brantford/Simcoe/Cayuga)",categories:["legal-advocate"],region:"Greater Hamilton Area",hours:"Office hours",description:"Family Court Support Worker serving Brantford, Simcoe, Cayuga.",verified:""},
+  {id:"h6",name:"FCSW \u2014 Gillian\u2019s Place (St. Catharines)",categories:["legal-advocate"],region:"Niagara Region",hours:"Office hours",description:"Family Court Support Worker at St. Catharines courthouse.",verified:""},
+  {id:"h7",name:"FCSW \u2014 Women\u2019s Place South Niagara (Welland)",categories:["legal-advocate"],region:"Niagara Region",hours:"Office hours",description:"Family Court Support Worker at Welland courthouse.",verified:""},
+  {id:"t5",name:"SAVIS of Halton",categories:["crisis","counselling"],region:"Halton Region",phone:"(905) 875-1555",website:"https://www.savisofhalton.org/",hours:"24/7",description:"Crisis support, counselling, accompaniment in Halton.",verified:""},
+  {id:"t8",name:"FCSW \u2014 Halton Women\u2019s Place (Milton)",categories:["legal-advocate"],region:"Halton Region",hours:"Office hours",description:"Family Court Support Worker at Milton courthouse.",verified:""},
+  {id:"k1",name:"Guelph-Wellington Women in Crisis",categories:["crisis","counselling","shelter"],region:"Kitchener-Waterloo",phone:"(800) 265-7233",website:"https://gwwomenincrisis.org/",hours:"24/7",description:"Crisis line, shelter, counselling in Guelph-Wellington.",verified:""},
+  {id:"k2",name:"SASC Waterloo Region",categories:["crisis","counselling"],region:"Kitchener-Waterloo",phone:"(519) 741-8633",website:"https://www.sascwr.org/",hours:"24/7",description:"Crisis support, counselling, advocacy in Waterloo Region.",verified:""},
+  {id:"k3",name:"FCSW \u2014 Guelph Wellington Women in Crisis",categories:["legal-advocate"],region:"Kitchener-Waterloo",hours:"Office hours",description:"Family Court Support Worker at Guelph courthouse.",verified:""},
+  {id:"k4",name:"FCSW \u2014 SASC Waterloo (Kitchener/Cambridge)",categories:["legal-advocate"],region:"Kitchener-Waterloo",phone:"519-571-0121",website:"https://www.sascwr.org/family-court-support-program.html",hours:"Office hours",description:"Family Court Support Workers at Kitchener and Cambridge courthouses.",verified:""},
+  {id:"k5",name:"FCSW \u2014 SASC Waterloo (Waterloo)",categories:["legal-advocate"],region:"Kitchener-Waterloo",phone:"519-571-0121",hours:"Office hours",description:"Family Court Support Worker at Waterloo courthouse.",verified:""},
+];
+
+var genId = function() { return "r" + Date.now(); };
+var daysSince = function(d) { if (!d) return null; return Math.floor((Date.now() - new Date(d).getTime()) / 86400000); };
+
+/* --- Aesop-inspired styles: warm, quiet, generous space, earthy green --- */
+var bg = "#F5F1EC";
+var white = "#FFFFFF";
+var green = "#3C5A3E";
+var greenLight = "#4A6741";
+var greenPale = "#EBF0EB";
+var greenFaint = "#F2F5F2";
+var textDark = "#2B2B2B";
+var textMed = "#555049";
+var textLight = "#7A7468";
+var border = "#E2DDD6";
+var accent = "#9E8A6E";
+var emergency = "#A63D2F";
+var emergencyBg = "#FAF0EE";
+var serif = "Georgia, 'Times New Roman', serif";
+var sans = "-apple-system, 'Segoe UI', system-ui, sans-serif";
+
+function Card(p) {
+  var r = p.r;
+  var _s = useState(false), open = _s[0], setOpen = _s[1];
+  var has = r.whatToExpect || r.servicesOffered || r.intakeProcess || r.goodToKnow || r.accessibility;
+  function toggle() { setOpen(!open); }
+  return React.createElement("div", {role:"button",tabIndex:0,onClick:toggle,onKeyDown:function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();toggle()}},style:{background:white,padding:"28px 32px",marginBottom:2,cursor:"pointer",borderBottom:"1px solid "+border}},
+    React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:16,flexWrap:"wrap"}},
+      React.createElement("div",{style:{flex:1}},
+        React.createElement("h3",{style:{fontFamily:serif,fontSize:18,fontWeight:400,color:textDark,marginBottom:6,letterSpacing:"-0.01em"}},r.name),
+        React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}},
+          r.categories.map(function(c){var x=CATS.find(function(z){return z.id===c});return x?React.createElement("span",{key:c,style:{fontSize:10,fontWeight:500,padding:"3px 10px",borderRadius:2,background:greenPale,color:greenLight,letterSpacing:"0.05em",textTransform:"uppercase"}},x.label):null}),
+          (r.highlights||[]).map(function(h){var x=HL.find(function(z){return z.id===h});return x?React.createElement("span",{key:h,style:{fontSize:10,fontWeight:500,padding:"3px 10px",borderRadius:2,border:"1px solid "+border,color:textMed,letterSpacing:"0.05em"}},x.label):null})
+        )
+      ),
+      r.phone?React.createElement("a",{href:"tel:"+r.phone.replace(/[^\d+]/g,""),onClick:function(e){e.stopPropagation()},style:{fontFamily:serif,fontSize:15,color:white,background:green,textDecoration:"none",padding:"10px 20px",letterSpacing:"0.02em"}},r.phone):null
+    ),
+    React.createElement("p",{style:{fontSize:14,color:textMed,lineHeight:1.7,marginTop:4}},r.description),
+    open?React.createElement("div",{style:{marginTop:20,paddingTop:20,borderTop:"1px solid "+border}},
+      r.hours?React.createElement("p",{style:{fontSize:13,color:textMed,marginBottom:4}},React.createElement("span",{style:{color:textDark,fontWeight:600}},"Hours: "),r.hours):null,
+      r.languages?React.createElement("p",{style:{fontSize:13,color:textMed,marginBottom:4}},React.createElement("span",{style:{color:textDark,fontWeight:600}},"Languages: "),r.languages):null,
+      r.tty?React.createElement("p",{style:{fontSize:13,color:textMed,marginBottom:4}},React.createElement("span",{style:{color:textDark,fontWeight:600}},"TTY: "),r.tty):null,
+      r.text?React.createElement("p",{style:{fontSize:13,color:textMed,marginBottom:4}},React.createElement("span",{style:{color:textDark,fontWeight:600}},"Text: "),r.text):null,
+      r.website?React.createElement("p",{style:{fontSize:13,color:textMed,marginBottom:4}},React.createElement("span",{style:{color:textDark,fontWeight:600}},"Website: "),React.createElement("a",{href:r.website,target:"_blank",rel:"noopener noreferrer",style:{color:green},onClick:function(e){e.stopPropagation()}},r.website.replace(/^https?:\/\//,""))):null,
+      has?React.createElement("div",{style:{marginTop:20,padding:"24px 28px",background:greenFaint,borderLeft:"2px solid "+greenLight}},
+        React.createElement("h4",{style:{fontFamily:serif,fontSize:15,fontWeight:400,color:textDark,marginBottom:14,letterSpacing:"0.02em"}},"What to expect from this service"),
+        r.whatToExpect?React.createElement("p",{style:{fontSize:13,color:textMed,lineHeight:1.8,marginBottom:10}},r.whatToExpect):null,
+        r.servicesOffered?React.createElement("p",{style:{fontSize:13,color:textMed,lineHeight:1.8,marginBottom:10}},React.createElement("span",{style:{fontWeight:600,color:textDark}},"Services: "),r.servicesOffered):null,
+        r.intakeProcess?React.createElement("p",{style:{fontSize:13,color:textMed,lineHeight:1.8,marginBottom:10}},React.createElement("span",{style:{fontWeight:600,color:textDark}},"First contact: "),r.intakeProcess):null,
+        r.goodToKnow?React.createElement("p",{style:{fontSize:13,color:textMed,lineHeight:1.8}},React.createElement("span",{style:{fontWeight:600,color:textDark}},"Good to know: "),r.goodToKnow):null
+      ):React.createElement("p",{style:{fontSize:12,color:textLight,fontStyle:"italic",marginTop:16}},"What to expect from this service will be added soon."),
+      r.verified?React.createElement("p",{style:{fontSize:11,color:greenLight,marginTop:12}},"Verified "+((daysSince(r.verified)===0)?"today":daysSince(r.verified)+" days ago")):React.createElement("p",{style:{fontSize:11,color:accent,marginTop:12}},"Not yet verified")
+    ):null,
+    React.createElement("p",{style:{fontSize:11,color:textLight,marginTop:10,letterSpacing:"0.05em",textTransform:"uppercase"}},open?"Less":"More")
+  );
+}
+
+function AForm(p) {
+  var blank = {name:"",description:"",categories:[],region:"All Ontario",phone:"",tty:"",text:"",website:"",hours:"",languages:"",highlights:[],verified:"",whatToExpect:"",servicesOffered:"",intakeProcess:"",accessibility:"",goodToKnow:""};
+  var _s = useState(p.resource || blank), f = _s[0], sf = _s[1];
+  function u(k,v) { sf(function(prev) { var n = {}; for (var x in prev) n[x] = prev[x]; n[k] = v; return n; }); }
+  function tog(k,id) { var a = f[k]||[]; u(k, a.indexOf(id)>=0 ? a.filter(function(x){return x!==id}) : a.concat([id])); }
+  var inp = function(l,k,o) {
+    return React.createElement("div",{style:{gridColumn:(o&&o.full)?"1/-1":undefined,marginBottom:8}},
+      React.createElement("label",{style:{fontSize:11,fontWeight:500,color:textDark,textTransform:"uppercase",letterSpacing:"0.08em",display:"block",marginBottom:6}},l),
+      (o&&o.area)?React.createElement("textarea",{value:f[k]||"",onChange:function(e){u(k,e.target.value)},rows:o.rows||3,placeholder:o&&o.ph,style:{width:"100%",padding:12,border:"1px solid "+border,fontSize:14,fontFamily:sans,resize:"vertical",background:white}}):
+      (o&&o.sel)?React.createElement("select",{value:f[k],onChange:function(e){u(k,e.target.value)},style:{width:"100%",padding:12,border:"1px solid "+border,fontSize:14,fontFamily:sans,background:white}},o.opts.map(function(x){return React.createElement("option",{key:x},x)})):
+      React.createElement("input",{value:f[k]||"",onChange:function(e){u(k,e.target.value)},placeholder:o&&o.ph,style:{width:"100%",padding:12,border:"1px solid "+border,fontSize:14,fontFamily:sans,background:white}})
+    );
+  };
+  return React.createElement("div",{style:{background:white,padding:32,marginBottom:24,borderBottom:"1px solid "+border}},
+    React.createElement("h3",{style:{fontFamily:serif,fontSize:20,fontWeight:400,color:textDark,marginBottom:24}},(p.resource?"Edit":"Add")+" Resource"),
+    React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 20px"}},
+      inp("Name *","name"),inp("Region","region",{sel:true,opts:REGIONS}),inp("Description *","description",{full:true,area:true}),inp("Phone","phone"),inp("Website","website"),inp("Hours","hours",{ph:"24/7 or Mon-Fri 9-5"}),inp("Languages","languages"),inp("TTY","tty"),inp("Text line","text"),
+      React.createElement("div",{style:{gridColumn:"1/-1",marginBottom:8,marginTop:8}},React.createElement("label",{style:{fontSize:11,fontWeight:500,color:textDark,textTransform:"uppercase",letterSpacing:"0.08em",display:"block",marginBottom:8}},"Categories"),React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:6}},CATS.map(function(c){return React.createElement("button",{key:c.id,onClick:function(){tog("categories",c.id)},style:{padding:"8px 14px",fontSize:11,fontWeight:500,background:f.categories.indexOf(c.id)>=0?green:bg,color:f.categories.indexOf(c.id)>=0?white:textDark,border:"none",cursor:"pointer",letterSpacing:"0.05em",textTransform:"uppercase"}},c.label)}))),
+      React.createElement("div",{style:{gridColumn:"1/-1",marginBottom:8}},React.createElement("label",{style:{fontSize:11,fontWeight:500,color:textDark,textTransform:"uppercase",letterSpacing:"0.08em",display:"block",marginBottom:8}},"Highlights"),React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:6}},HL.map(function(h){return React.createElement("button",{key:h.id,onClick:function(){tog("highlights",h.id)},style:{padding:"8px 14px",fontSize:11,fontWeight:500,background:(f.highlights||[]).indexOf(h.id)>=0?green:bg,color:(f.highlights||[]).indexOf(h.id)>=0?white:textDark,border:"none",cursor:"pointer"}},h.label)}))),
+      React.createElement("div",{style:{gridColumn:"1/-1",padding:"16px 0",borderTop:"1px solid "+border,marginTop:8}},React.createElement("p",{style:{fontSize:13,fontWeight:500,color:textDark,marginBottom:4}},"What to expect (fill in after calling)")),
+      inp("Overview","whatToExpect",{full:true,area:true,ph:"When you call, a counsellor will answer..."}),inp("Services","servicesOffered",{full:true,area:true,ph:"What do they provide?"}),inp("First contact","intakeProcess",{full:true,area:true,ph:"What happens the first time?"}),inp("Good to know","goodToKnow",{full:true,area:true,rows:2,ph:"No police report needed, etc."})
+    ),
+    React.createElement("div",{style:{display:"flex",gap:12,marginTop:20}},
+      React.createElement("button",{onClick:function(){if(f.name&&f.description&&f.categories.length)p.onSave(f)},style:{background:green,color:white,border:"none",padding:"12px 28px",fontSize:13,cursor:"pointer",letterSpacing:"0.05em",textTransform:"uppercase"}},"Save"),
+      React.createElement("button",{onClick:p.onCancel,style:{background:"none",color:textDark,border:"1px solid "+border,padding:"12px 28px",fontSize:13,cursor:"pointer",letterSpacing:"0.05em",textTransform:"uppercase"}},"Cancel")
+    )
+  );
+}
+
+function App() {
+  var _r = useState(SEED), res = _r[0], setRes = _r[1];
+  var _p = useState("home"), page = _p[0], setPage = _p[1];
+  var _st = useState(0), step = _st[0], setStep = _st[1];
+  var _si = useState(null), sit = _si[0], setSit = _si[1];
+  var _n = useState(null), need = _n[0], setNeed = _n[1];
+  var _a = useState(null), appr = _a[0], setAppr = _a[1];
+  var _re = useState("All Ontario"), region = _re[0], setRegion = _re[1];
+  var _rf = useState([]), rf = _rf[0], setRf = _rf[1];
+  var _df = useState("all"), df = _df[0], setDf = _df[1];
+  var _dr = useState("All Ontario"), dr = _dr[0], setDr = _dr[1];
+  var _ds = useState(""), ds = _ds[0], setDs = _ds[1];
+  var _au = useState(false), auth = _au[0], setAuth = _au[1];
+  var _pi = useState(""), pin = _pi[0], setPin = _pi[1];
+  var _pe = useState(false), pe = _pe[0], setPe = _pe[1];
+  var _ed = useState(null), editing = _ed[0], setEditing = _ed[1];
+  var _sf = useState(false), showForm = _sf[0], setShowForm = _sf[1];
+
+  useEffect(function(){(function(){try{if(window.storage){window.storage.get(SK).then(function(r){if(r&&r.value){var p=JSON.parse(r.value);if(Array.isArray(p)&&p.length>0){setRes(p);return}}window.storage.set(SK,JSON.stringify(SEED))}).catch(function(){})}}catch(e){}})()},[]);
+  var save = useCallback(function(d){setRes(d);try{if(window.storage)window.storage.set(SK,JSON.stringify(d))}catch(e){}},[]);
+  function reset(){setSit(null);setNeed(null);setAppr(null);setRegion("All Ontario");setRf([]);setStep(0)}
+
+  var sitNeeds = NEEDS_MAP[sit] || [];
+  var allNeeds = sitNeeds;
+  var curNeed = sitNeeds.concat(ID_NEEDS).find(function(n){return n.id===need});
+  var skip = curNeed && (curNeed.skip || curNeed.hl);
+  var resStep = skip ? 3 : 4;
+
+  function getRes() {
+    var cats = curNeed ? (curNeed.cats||[]) : [];
+    var hls = curNeed ? (curNeed.hl||[]) : [];
+    var rc = cats.slice();
+    if (sit==="leaving" && rc.indexOf("shelter")<0) rc.push("shelter");
+    return res.filter(function(r) {
+      if (rc.length>0 && !r.categories.some(function(c){return rc.indexOf(c)>=0})) return false;
+      if (hls.length>0 && !(r.highlights && hls.some(function(h){return r.highlights.indexOf(h)>=0}))) return false;
+      if (appr==="community" && !r.categories.some(function(c){return c!=="legal-info"&&c!=="legal-advocate"})) return false;
+      if (region!=="All Ontario" && r.region!=="All Ontario" && r.region!==region) return false;
+      if (rf.length>0 && !(r.highlights && rf.some(function(f){return r.highlights.indexOf(f)>=0}))) return false;
+      return true;
+    }).sort(function(a,b){var al=a.region!=="All Ontario"?1:0;var bl=b.region!=="All Ontario"?1:0;if(bl!==al)return bl-al;return a.name.localeCompare(b.name)});
+  }
+  function getDirRes() {
+    return res.filter(function(r){
+      if(df!=="all"&&r.categories.indexOf(df)<0)return false;
+      if(dr!=="All Ontario"&&r.region!=="All Ontario"&&r.region!==dr)return false;
+      if(ds&&r.name.toLowerCase().indexOf(ds.toLowerCase())<0&&r.description.toLowerCase().indexOf(ds.toLowerCase())<0)return false;
+      return true;
+    });
+  }
+
+  function choice(items,value,onPick) {
+    return React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:2}},items.map(function(i){
+      var active = (i.id||i) === value;
+      return React.createElement("button",{key:i.id||i,onClick:function(){onPick(i.id||i)},style:{background:active?greenFaint:white,borderBottom:"1px solid "+border,border:"none",borderBottom:"1px solid "+border,padding:"24px 28px",textAlign:"left",cursor:"pointer",fontFamily:sans}},
+        React.createElement("span",{style:{fontFamily:serif,fontSize:17,fontWeight:400,color:textDark,display:"block",letterSpacing:"-0.01em"}},i.label||i),
+        i.sub?React.createElement("span",{style:{fontSize:13,color:textLight,marginTop:4,display:"block"}},i.sub):null
+      );
+    }));
+  }
+
+  function ctx(children) {
+    return React.createElement("div",{style:{padding:"24px 28px",background:greenFaint,borderLeft:"2px solid "+greenLight,marginBottom:24}},children);
+  }
+
+  var link = {background:"none",border:"none",color:green,fontSize:13,cursor:"pointer",fontFamily:sans,padding:0,textDecoration:"underline"};
+
+  return React.createElement("div",{style:{fontFamily:sans,background:bg,color:textDark,minHeight:"100vh",lineHeight:1.6}},
+    React.createElement("style",null,"@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}*{box-sizing:border-box;margin:0;padding:0}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid "+green+";outline-offset:2px}@media(prefers-reduced-motion:reduce){*{animation:none!important}}"),
+    React.createElement("a",{href:"#main",style:{position:"absolute",left:-9999,top:"auto",width:1,height:1,overflow:"hidden",zIndex:10001},onFocus:function(e){e.target.style.cssText="position:fixed;left:50%;top:8px;transform:translateX(-50%);width:auto;height:auto;background:"+green+";color:white;padding:12px 24px;z-index:10001;font-size:14px;text-decoration:none"},onBlur:function(e){e.target.style.cssText="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden"}},"Skip to content"),
+    React.createElement("button",{onClick:function(){window.location.href="https://www.google.ca"},"aria-label":"Leave this site immediately",style:{position:"fixed",top:16,right:16,zIndex:10000,background:emergency,color:white,border:"none",padding:"10px 20px",fontFamily:sans,fontSize:12,fontWeight:600,cursor:"pointer",letterSpacing:"0.08em",textTransform:"uppercase"}},"Quick Exit"),
+    
+    React.createElement("nav",{"aria-label":"Main navigation",style:{background:bg,borderBottom:"1px solid "+border,position:"sticky",top:0,zIndex:100}},
+      React.createElement("div",{style:{maxWidth:900,margin:"0 auto",padding:"0 28px",display:"flex",alignItems:"center",justifyContent:"space-between",height:60}},
+        React.createElement("button",{onClick:function(){setPage("home")},style:{background:"none",border:"none",cursor:"pointer",fontFamily:serif,fontSize:18,fontWeight:400,color:textDark,letterSpacing:"0.02em"}},"Safe Path Ontario"),
+        React.createElement("div",{style:{display:"flex",gap:0}},
+          ["Home","Find Support","Directory"].map(function(l,i){var p=["home","journey","directory"][i];return React.createElement("button",{key:p,onClick:function(){setPage(p);if(p==="journey")reset()},style:{background:"none",border:"none",padding:"10px 16px",fontSize:12,color:page===p?textDark:textLight,cursor:"pointer",letterSpacing:"0.08em",textTransform:"uppercase",fontWeight:page===p?600:400,minHeight:44}},l)})
+        )
+      )
+    ),
+    React.createElement("main",{id:"main"},
+
+      page==="home"?React.createElement("div",null,
+        React.createElement("div",{style:{padding:"80px 28px 70px",textAlign:"center",maxWidth:640,margin:"0 auto",position:"relative"}},React.createElement("div",{style:{position:"absolute",top:20,left:"5%",fontSize:64,opacity:0.06,transform:"rotate(-15deg)",pointerEvents:"none",userSelect:"none"}},"\u{1F33F}"),React.createElement("div",{style:{position:"absolute",bottom:10,right:"8%",fontSize:48,opacity:0.06,transform:"rotate(20deg)",pointerEvents:"none",userSelect:"none"}},"\u{1F331}"),React.createElement("div",{style:{position:"absolute",top:"40%",right:"2%",fontSize:36,opacity:0.04,transform:"rotate(-30deg)",pointerEvents:"none",userSelect:"none"}},"\u{1F343}"),
+          React.createElement("p",{style:{fontSize:12,letterSpacing:"0.15em",textTransform:"uppercase",color:greenLight,marginBottom:24}},"Ontario, Canada"),
+          React.createElement("h1",{style:{fontFamily:serif,fontSize:"clamp(30px,5vw,44px)",fontWeight:400,color:textDark,lineHeight:1.25,marginBottom:20,letterSpacing:"-0.02em"}},"You are not alone.",React.createElement("br",null),"And you don\u2019t have to figure this out by yourself."),
+          React.createElement("p",{style:{fontSize:15,color:textMed,lineHeight:1.85,marginBottom:40,maxWidth:500,margin:"0 auto 40px"}},"Safe Path Ontario walks you through the support available to you \u2014 whether you\u2019re in crisis right now, healing from the past, or helping someone you care about. Every resource here has been personally verified."),
+          React.createElement("div",{style:{display:"flex",gap:16,justifyContent:"center",flexWrap:"wrap"}},
+            React.createElement("button",{onClick:function(){setPage("journey");reset()},style:{background:green,color:white,border:"none",padding:"14px 32px",fontSize:13,cursor:"pointer",letterSpacing:"0.08em",textTransform:"uppercase"}},"Find support"),
+            React.createElement("button",{onClick:function(){setPage("directory")},style:{background:"none",color:textDark,border:"1px solid "+border,padding:"14px 32px",fontSize:13,cursor:"pointer",letterSpacing:"0.08em",textTransform:"uppercase"}},"Browse directory")
+          )
+        ),
+        React.createElement("div",{style:{textAlign:"center",padding:"12px 0",fontSize:18,color:greenLight,opacity:0.25,letterSpacing:12}},"\u2022 \u{1F33F} \u2022"),React.createElement("div",{style:{background:emergencyBg,padding:"16px 28px",textAlign:"center"}},
+          React.createElement("span",{style:{fontSize:12,color:emergency,fontWeight:500,letterSpacing:"0.05em"}},"If you are in immediate danger "),
+          React.createElement("a",{href:"tel:911",style:{fontFamily:serif,fontSize:16,fontWeight:400,color:emergency,marginLeft:8,textDecoration:"none",borderBottom:"1px solid "+emergency}},"call 911")
+        )
+      ):null,
+
+      page==="journey"?React.createElement("div",{"aria-live":"polite",style:{maxWidth:640,margin:"0 auto",padding:"48px 28px 100px"}},
+        React.createElement("div",{style:{display:"flex",gap:6,marginBottom:48,justifyContent:"center"}},
+          (skip?["Situation","Support","Location","Results"]:["Situation","Support","Approach","Location","Results"]).map(function(l,i){return React.createElement("span",{key:i,style:{fontSize:10,color:i<=step?textDark:textLight,fontWeight:i<=step?600:400,letterSpacing:"0.08em",textTransform:"uppercase",padding:"0 4px"}},l)})
+        ),
+
+        step===0?React.createElement("div",null,
+          React.createElement("h2",{style:{fontFamily:serif,fontSize:28,fontWeight:400,color:textDark,marginBottom:8}},"What brings you here?"),
+          React.createElement("p",{style:{fontSize:14,color:textLight,marginBottom:32}},"Take your time. There is no wrong answer."),
+          choice(SITS,sit,function(v){setSit(v);setNeed(null);setAppr(null);setTimeout(function(){setStep(1)},200)})
+        ):null,
+
+        step===1?React.createElement("div",null,
+          React.createElement("h2",{style:{fontFamily:serif,fontSize:28,fontWeight:400,color:textDark,marginBottom:8}},"What kind of support?"),
+          React.createElement("p",{style:{fontSize:14,color:textLight,marginBottom:32}},"Pick what feels most important right now."),
+          choice(allNeeds,need,function(v){setNeed(v);setAppr(null);setTimeout(function(){setStep(2)},200)})
+        ):null,
+
+        step===2&&!skip?React.createElement("div",null,
+          React.createElement("h2",{style:{fontFamily:serif,fontSize:28,fontWeight:400,color:textDark,marginBottom:8}},"How would you like to access support?"),
+          React.createElement("p",{style:{fontSize:14,color:textLight,marginBottom:32}},"There is no pressure to involve police. Both paths are valid."),
+          choice(APPROACHES,appr,function(v){setAppr(v);setTimeout(function(){setStep(3)},200)})
+        ):null,
+
+        (step===2&&skip)||(step===3&&!skip)?React.createElement("div",null,
+          React.createElement("h2",{style:{fontFamily:serif,fontSize:28,fontWeight:400,color:textDark,marginBottom:8}},"Where in Ontario are you?"),
+          React.createElement("p",{style:{fontSize:14,color:textLight,marginBottom:32}},"We will show nearby services first."),
+          choice(REGIONS.map(function(r){return{id:r,label:r}}),region,function(v){setRegion(v);setTimeout(function(){setStep(resStep)},200)})
+        ):null,
+
+        step===resStep?React.createElement("div",null,
+          React.createElement("h2",{style:{fontFamily:serif,fontSize:28,fontWeight:400,color:textDark,marginBottom:8}},"Here is what is available to you"),
+          React.createElement("div",{style:{display:"flex",gap:16,marginBottom:32,flexWrap:"wrap"}},
+            React.createElement("button",{onClick:function(){setStep(resStep-1)},style:link},"Back"),
+            React.createElement("button",{onClick:function(){setStep(1)},style:link},"Change selection"),
+            React.createElement("button",{onClick:reset,style:link},"Start over")
+          ),
+          sit==="sa-recent"&&need==="medical"?ctx(React.createElement("p",{style:{fontSize:14,color:textDark,lineHeight:1.8}},React.createElement("strong",null,"If the assault was within the last 12 days,")," go to any hospital ER and ask for the SA/DV Treatment Centre team. No police report needed. Call ",React.createElement("a",{href:"tel:18556287238",style:{color:green,fontWeight:600}},"1-855-628-7238")," for the nearest centre.")):null,
+          sit==="leaving"?ctx(React.createElement("p",{style:{fontSize:14,color:textDark,lineHeight:1.8}},React.createElement("strong",null,"Safety planning is important.")," Consider calling a crisis line before leaving. Shelters can also advise by phone.")):null,
+          need==="legal-info"&&sit==="sa-recent"?ctx(React.createElement("p",{style:{fontSize:14,color:textDark,lineHeight:1.8}},React.createElement("strong",null,"You have options.")," You can connect with an advocate at your local sexual assault centre who can walk you through your choices. You can access up to 4 hours of free legal advice through Ontario\u2019s Independent Legal Advice program \u2014 no police report required.")):null,
+          need==="legal-info"&&(sit==="ipv-ongoing"||sit==="leaving")?ctx(React.createElement("p",{style:{fontSize:14,color:textDark,lineHeight:1.8}},React.createElement("strong",null,"You have options.")," A Family Court Support Worker can help you understand the family court process, protection orders, and custody. They are free in every court district. You can also access free legal aid through Legal Aid Ontario.")):null,
+          need==="legal-info"&&sit!=="sa-recent"&&sit!=="ipv-ongoing"&&sit!=="leaving"?ctx(React.createElement("p",{style:{fontSize:14,color:textDark,lineHeight:1.8}},React.createElement("strong",null,"You have options.")," There is no time limit for reporting sexual violence in Ontario. Connect with an advocate at your local sexual assault centre, or access up to 4 hours of free legal advice.")):null,
+          need==="legal-advocate"?ctx(React.createElement("p",{style:{fontSize:14,color:textDark,lineHeight:1.8}},React.createElement("strong",null,"Family Court Support Workers")," are free in every Ontario court district. Court prep, safety planning, accompaniment. No proof of abuse needed.")):null,
+          (function(){var allHLs={};var cats2=curNeed?(curNeed.cats||[]):[];var hls2=curNeed?(curNeed.hl||[]):[];var rc2=cats2.slice();if(sit==="leaving"&&rc2.indexOf("shelter")<0)rc2.push("shelter");res.filter(function(r){if(rc2.length>0&&!r.categories.some(function(c){return rc2.indexOf(c)>=0}))return false;if(hls2.length>0&&!(r.highlights&&hls2.some(function(h){return r.highlights.indexOf(h)>=0})))return false;if(appr==="community"&&!r.categories.some(function(c){return c!=="legal-info"&&c!=="legal-advocate"}))return false;if(region!=="All Ontario"&&r.region!=="All Ontario"&&r.region!==region)return false;return true}).forEach(function(r){if(r.highlights)r.highlights.forEach(function(h){allHLs[h]=true})});var avail=HL.filter(function(h){return allHLs[h.id]});if(avail.length===0)return null;return React.createElement("div",{style:{marginBottom:24}},React.createElement("p",{style:{fontSize:11,color:textLight,marginBottom:8,letterSpacing:"0.05em",textTransform:"uppercase"}},"Filter by"),React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:6}},avail.map(function(h){var active=rf.indexOf(h.id)>=0;return React.createElement("button",{key:h.id,onClick:function(){setRf(active?rf.filter(function(x){return x!==h.id}):rf.concat([h.id]))},style:{padding:"8px 14px",fontSize:11,background:active?green:white,color:active?white:textMed,border:active?"none":"1px solid "+border,cursor:"pointer",letterSpacing:"0.03em"}},h.label)}),rf.length>0?React.createElement("button",{onClick:function(){setRf([])},style:{padding:"8px 14px",fontSize:11,background:"none",color:green,border:"none",cursor:"pointer",textDecoration:"underline"}},"Clear"):null))})(),
+          React.createElement("div",null,getRes().length===0?React.createElement("p",{style:{padding:48,textAlign:"center",fontSize:14,color:textLight}},"No exact matches. Try adjusting your selections."):getRes().map(function(r){return React.createElement(Card,{key:r.id,r:r})}))
+        ):null,
+
+        step>0&&step<resStep?React.createElement("button",{onClick:function(){setStep(step-1)},style:{position:"fixed",bottom:24,left:24,background:white,border:"1px solid "+border,padding:"10px 20px",fontSize:12,cursor:"pointer",color:textDark,letterSpacing:"0.05em",textTransform:"uppercase"}},"Back"):null
+      ):null,
+
+      page==="directory"?React.createElement("div",{style:{maxWidth:900,margin:"0 auto",padding:"48px 28px 100px"}},
+        React.createElement("h2",{style:{fontFamily:serif,fontSize:28,fontWeight:400,color:textDark,marginBottom:32}},"Directory"),
+        React.createElement("div",{style:{display:"flex",gap:12,marginBottom:24,flexWrap:"wrap"}},
+          React.createElement("input",{value:ds,onChange:function(e){var v=e.target.value;setDs(v);if(v.toLowerCase()==="admin"){setDs("");setPage(auth?"admin":"admin-login")}},"aria-label":"Search resources",placeholder:"Search",style:{padding:12,border:"1px solid "+border,fontSize:14,fontFamily:sans,flex:1,minWidth:180,background:white}}),
+          React.createElement("select",{value:df,onChange:function(e){setDf(e.target.value)},style:{padding:12,border:"1px solid "+border,fontSize:13,fontFamily:sans,background:white}},React.createElement("option",{value:"all"},"All categories"),CATS.map(function(c){return React.createElement("option",{key:c.id,value:c.id},c.label)})),
+          React.createElement("select",{value:dr,onChange:function(e){setDr(e.target.value)},style:{padding:12,border:"1px solid "+border,fontSize:13,fontFamily:sans,background:white}},REGIONS.map(function(r){return React.createElement("option",{key:r},r)}))
+        ),
+        React.createElement("p",{style:{fontSize:12,color:textLight,marginBottom:24,letterSpacing:"0.05em"}},getDirRes().length+" results"),
+        React.createElement("div",null,getDirRes().map(function(r){return React.createElement(Card,{key:r.id,r:r})}))
+      ):null,
+
+      page==="admin-login"?React.createElement("div",{style:{maxWidth:400,margin:"0 auto",padding:"100px 28px",textAlign:"center"}},
+        React.createElement("h2",{style:{fontFamily:serif,fontSize:24,fontWeight:400,color:textDark,marginBottom:24}},"Admin"),
+        React.createElement("div",{style:{display:"flex",gap:12,justifyContent:"center"}},
+          React.createElement("input",{type:"password",value:pin,onChange:function(e){setPin(e.target.value);setPe(false)},placeholder:"PIN",style:{padding:12,border:"1px solid "+border,fontSize:14,width:180,background:white},onKeyDown:function(e){if(e.key==="Enter"){if(pin===ADMIN_PIN){setAuth(true);setPage("admin")}else setPe(true)}}}),
+          React.createElement("button",{onClick:function(){if(pin===ADMIN_PIN){setAuth(true);setPage("admin")}else setPe(true)},style:{background:green,color:white,border:"none",padding:"12px 24px",fontSize:12,cursor:"pointer",letterSpacing:"0.05em",textTransform:"uppercase"}},"Enter")
+        ),
+        pe?React.createElement("p",{style:{color:emergency,fontSize:13,marginTop:12}},"Incorrect PIN."):null
+      ):null,
+
+      page==="admin"&&auth?React.createElement("div",{style:{maxWidth:900,margin:"0 auto",padding:"48px 28px 100px"}},
+        React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:32,flexWrap:"wrap",gap:16}},
+          React.createElement("div",null,React.createElement("h2",{style:{fontFamily:serif,fontSize:24,fontWeight:400,color:textDark,marginBottom:4}},"Admin"),React.createElement("p",{style:{fontSize:13,color:textLight}},res.length+" resources. ",React.createElement("span",{style:{color:emergency}},res.filter(function(r){return !r.verified}).length+" unverified"))),
+          React.createElement("button",{onClick:function(){setEditing(null);setShowForm(true)},style:{background:green,color:white,border:"none",padding:"12px 24px",fontSize:12,cursor:"pointer",letterSpacing:"0.05em",textTransform:"uppercase"}},"+ Add")
+        ),
+        showForm?React.createElement(AForm,{resource:editing,onSave:function(d){if(editing){save(res.map(function(r){return r.id===editing.id?Object.assign({},d,{id:editing.id}):r}))}else{save(res.concat([Object.assign({},d,{id:genId()})]))}setShowForm(false);setEditing(null)},onCancel:function(){setShowForm(false);setEditing(null)}}):null,
+        React.createElement("div",null,res.slice().sort(function(a,b){if(!a.verified&&b.verified)return -1;if(a.verified&&!b.verified)return 1;return a.name.localeCompare(b.name)}).map(function(r){return React.createElement("div",{key:r.id,style:{display:"flex",alignItems:"center",gap:16,padding:"16px 24px",background:white,borderBottom:"1px solid "+border,borderLeft:r.verified?"3px solid "+greenLight:"3px solid "+accent,flexWrap:"wrap"}},
+          React.createElement("div",{style:{flex:1,minWidth:0}},React.createElement("p",{style:{fontWeight:500,fontSize:14,color:textDark,marginBottom:2}},r.name),React.createElement("p",{style:{fontSize:12,color:textLight}},r.region+(r.verified?" \u2014 Verified "+r.verified:" \u2014 Unverified"))),
+          React.createElement("div",{style:{display:"flex",gap:8}},
+            React.createElement("button",{onClick:function(){setEditing(r);setShowForm(true)},style:{background:"none",border:"1px solid "+border,padding:"6px 14px",fontSize:11,cursor:"pointer",letterSpacing:"0.05em",textTransform:"uppercase"}},"Edit"),
+            React.createElement("button",{onClick:function(){if(window.confirm("Remove "+r.name+"?"))save(res.filter(function(x){return x.id!==r.id}))},style:{background:"none",border:"1px solid "+border,padding:"6px 14px",fontSize:11,cursor:"pointer",color:emergency,letterSpacing:"0.05em",textTransform:"uppercase"}},"Remove"),
+            React.createElement("button",{onClick:function(){save(res.map(function(x){return x.id===r.id?Object.assign({},x,{verified:new Date().toISOString().split("T")[0]}):x}))},style:{background:green,border:"none",padding:"6px 14px",fontSize:11,cursor:"pointer",color:white,letterSpacing:"0.05em",textTransform:"uppercase"}},"Verify")
+          )
+        )}))
+      ):null
+
+    ),
+    React.createElement("footer",{style:{textAlign:"center",padding:"64px 28px 48px",borderTop:"1px solid "+border}},
+      React.createElement("div",{style:{fontSize:28,marginBottom:16,opacity:0.15}},"\u{1F33F}"),React.createElement("p",{style:{fontFamily:serif,fontSize:20,fontWeight:400,color:textDark,marginBottom:8,letterSpacing:"-0.01em"}},"You deserve support. You deserve safety."),
+      React.createElement("p",{style:{fontSize:13,color:textLight,maxWidth:440,margin:"0 auto"}},"Safe Path Ontario is independently maintained and verified.")
+    )
+  );
+}
+
+ReactDOM.render(React.createElement(App), document.getElementById("root"));
+</script>
+</body>
+</html>
